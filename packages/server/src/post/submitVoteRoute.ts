@@ -6,14 +6,19 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import ZK_KYCABI from "../abi/ZK_KYC.json";
-const WebAuthnAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
 const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545"; // Use RPC_URL from .env if available
+const ZK_KYC_ADDRESS = process.env.ZK_KYC_ADDRESS?.trim();
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY; // Load the private key from .env
 
 if (!PRIVATE_KEY) {
   console.error("Private key not found in .env file.");
   process.exit(1); // Exit if no private key found
+}
+
+if (!ZK_KYC_ADDRESS) {
+  console.error("ZK_KYC_ADDRESS not found in .env file.");
+  process.exit(1);
 }
 
 const submitVoteRoute = Router();
@@ -33,7 +38,7 @@ submitVoteRoute.post("/vote", async (req, res) => {
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
-    const zkKYC = new ethers.Contract(WebAuthnAddress, ZK_KYCABI.abi, wallet);
+    const zkKYC = new ethers.Contract(ZK_KYC_ADDRESS, ZK_KYCABI.abi, wallet);
 
     // we can check the validity of the proof here, but for this demo I am skipping it
     const publicInputsArray = [
@@ -48,9 +53,12 @@ submitVoteRoute.post("/vote", async (req, res) => {
     try {
       await zkKYC.vote(proofBytes, publicInputsArray);
       res.json({ success: true });
-    } catch (error) {
-      console.error("Error fetching proposal data:", error);
-      res.json({ success: false });
+    } catch (error: any) {
+      const reason = error?.revert?.args?.[0]
+        || error?.reason
+        || "Vote transaction failed";
+      console.error("Vote failed:", reason, error);
+      res.json({ success: false, reason });
     }
   }
 });

@@ -17,6 +17,7 @@ contract ZK_KYC_DEPLOY is Script {
         UltraVerifier verifier = new UltraVerifier();
 
         console.log(address(zkKYC));
+        vm.writeFile("./cache/zk_kyc_address.txt", vm.toString(address(zkKYC)));
 
         // set verifier
         zkKYC.setVerifier(address(verifier));

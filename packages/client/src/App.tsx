@@ -7,6 +7,9 @@ import MainForm from './components/mainForm';
 import VoteForm from './components/voteForm';
 
 import { ChakraProvider, Box, Flex } from '@chakra-ui/react';
+import { API_URL } from './config';
+
+const SESSION_KEY = 'privacy-vote-session-id';
 
 const App: React.FC = () => {
   const { walletProvider } = useWeb3ModalProvider();
@@ -14,6 +17,28 @@ const App: React.FC = () => {
   const [username, setUsername] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [isRoaming, setIsRoaming] = useState<boolean>(false);
+
+  // On mount: detect server/chain restart and clear stale user data
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/status`);
+        const data = await res.json();
+        const prevSession = window.localStorage.getItem(SESSION_KEY);
+        if (prevSession && prevSession !== data.sessionId) {
+          console.log(
+            'Server restarted (session changed). Clearing local user data.',
+          );
+          window.localStorage.clear();
+        }
+        if (data.sessionId) {
+          window.localStorage.setItem(SESSION_KEY, data.sessionId);
+        }
+      } catch {
+        // Server not reachable; don't clear
+      }
+    })();
+  }, []);
 
   return (
     <ChakraProvider>
@@ -56,7 +81,7 @@ const App: React.FC = () => {
             borderRadius="lg"
             boxShadow="lg"
             bg="gray.700"
-            w={{ base: '90%', sm: '80%', md: 'lg' }}
+            w={{ base: '95%', sm: '90%', md: '3xl' }}
           >
             <VoteForm username={username} />
           </Box>

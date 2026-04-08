@@ -8,9 +8,24 @@ import { bytesToHex, toHex } from 'viem';
 import { BarretenbergBackend } from '@noir-lang/backend_barretenberg';
 import { Noir } from '@noir-lang/noir_js';
 import { getCircuit } from './getCircuit';
+import { API_URL, ZK_KYC_ADDRESS } from '../config';
 
 const ZK_KYCABI = require('../abi/ZK_KYC.json').abi;
-const WebAuthnAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
+
+// Cache Noir + Backend instances so they are initialised once and reused
+// across multiple generateProof calls (e.g. voting for 3 candidates).
+let cachedNoir: Noir | null = null;
+let cachedBackend: BarretenbergBackend | null = null;
+
+async function getNoirInstance(): Promise<Noir> {
+    if (cachedNoir && cachedBackend) return cachedNoir;
+    const circuit = await getCircuit();
+    cachedBackend = new BarretenbergBackend(circuit, {
+        threads: navigator.hardwareConcurrency,
+    });
+    cachedNoir = new Noir(circuit, cachedBackend);
+    return cachedNoir;
+}
 
 interface AlertFunction {
     (message: string): void;
@@ -50,36 +65,37 @@ export const generateProof = async (
 ) => {
     toast.success('Generating Proof');
 
-    const ethersProvider = new BrowserProvider(walletProvider);
-    const signer = await ethersProvider.getSigner();
+    // Reuse cached Noir instance for faster repeated calls
+    const noir = await getNoirInstance();
+    console.log('Noir backend ready (cached)');
 
-    const zkKYC = new ethers.Contract(WebAuthnAddress, ZK_KYCABI, signer);
-
-    // here you can chose to compile in the browser or use the precompiled circuit
-    const circuit = await getCircuit();
-
-    const backend = new BarretenbergBackend(circuit, {
-        threads: navigator.hardwareConcurrency,
-    });
-    const noir = new Noir(circuit, backend);
-    console.log('Proof compiled');
-
-    // 1) get proofSiblings and path from smart contract
+    // 1) get proofSiblings and path from server API (avoids browser→Anvil issues)
     // 2) parse proof public inputs
     // 3) generate proof via noir wasm
-    // 4) push proof to API => check if it is usuable on API side
-    // 5) write proof to state to vote using API
+    // 4) push proof to API
+    // 5) server submits to smart contract
 
-    const secretUserData = JSON.parse(
-        window.localStorage.getItem(`${username}-secret`) ?? '{}',
-    );
+    const secretRaw = window.localStorage.getItem(`${username}-secret`);
+    if (!secretRaw) {
+        throw new Error('Please complete KYC before voting.');
+    }
+    const secretUserData = JSON.parse(secretRaw);
+    if (secretUserData.leafIndex === undefined || secretUserData.leafIndex === null) {
+        throw new Error('KYC data is incomplete. Please request KYC again.');
+    }
 
-    const proofData = await zkKYC.createProof(secretUserData.leafIndex);
-    const _root = await zkKYC.getCurrentRoot();
+    // Fetch Merkle proof via server API instead of direct RPC call
+    const merkleRes = await fetch(`${API_URL}/merkle-proof/${secretUserData.leafIndex}`);
+    const merkleData = await merkleRes.json();
+    if (!merkleData.success) {
+        throw new Error(merkleData.message || 'Failed to get Merkle proof from server.');
+    }
+
+    const _root = BigInt(merkleData.root);
+    const _proofSiblings: bigint[] = merkleData.proofSiblings.map((s: string) => BigInt(s));
+    const _proofPathIndices: number[] = merkleData.proofPathIndices;
 
     const _nullifierHash = poseidon2([secretUserData.nulifier, proposalId]);
-    const _proofSiblings = proofData.proofSiblings;
-    const _proofPathIndices = proofData.proofPathIndices;
     const _nulifier = secretUserData.nulifier;
     const _secret = secretUserData.secret;
 
@@ -89,7 +105,7 @@ export const generateProof = async (
         proofSiblings: _proofSiblings.map((sibling: bigint) =>
             toHex(sibling, { size: 32 }),
         ),
-        proofPathIndices: _proofPathIndices.map((index: bigint) =>
+        proofPathIndices: _proofPathIndices.map((index: number) =>
             toHex(index, { size: 32 }),
         ),
         nulifier: toHex(_nulifier, { size: 32 }),
@@ -124,11 +140,15 @@ export const generateProof = async (
 
     const apiResult = await pushUserVoteProofToAPI(proofInputs);
 
+    if (!apiResult) {
+        throw new Error('Failed to connect to the voting server.');
+    }
     if (apiResult.success) {
         toast.success('Proof Generation Success');
         toast.success('Vote Successfully Submitted');
     } else {
-        toast.error('Vote Submission Failed');
+        const reason = apiResult.reason || 'Vote Submission Failed';
+        throw new Error(reason);
     }
 
     /*     
@@ -145,7 +165,7 @@ export const getVoteData = async (walletProvider: any, proposalId: number) => {
     const ethersProvider = new BrowserProvider(walletProvider);
     const signer = await ethersProvider.getSigner();
 
-    const zkKYC = new ethers.Contract(WebAuthnAddress, ZK_KYCABI, signer);
+    const zkKYC = new ethers.Contract(ZK_KYC_ADDRESS, ZK_KYCABI, signer);
 
     const voteData = await zkKYC.proposals(proposalId);
     console.log('VOTE DATA', voteData);
@@ -267,12 +287,11 @@ export const loginWithWebAuthn = async (
     // push userData to API
     let result = await requestKYCfromAPI(userData);
 
-    if (result.success) {
-        toast.success('User KYC approved');
-    } else {
-        toast.error('User KYC rejected');
+    if (!result || !result.success) {
+        toast.error(result?.message || 'User KYC rejected');
         return;
     }
+    toast.success('User KYC approved');
 
     console.log('RES', result);
 
@@ -300,7 +319,7 @@ async function requestKYCfromAPI(userData: any) {
     try {
         toast.success('Requesting KYC');
 
-        const response = await fetch('http://localhost:4000/request-kyc', {
+        const response = await fetch(`${API_URL}/request-kyc`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -321,7 +340,7 @@ async function requestKYCfromAPI(userData: any) {
 async function pushUserVoteProofToAPI(proofInputs: any) {
     console.log('proof', proofInputs);
     try {
-        const response = await fetch('http://localhost:4000/vote', {
+        const response = await fetch(`${API_URL}/vote`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
