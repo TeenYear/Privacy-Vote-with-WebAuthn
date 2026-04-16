@@ -32,7 +32,7 @@ const mainnet = {
   name: 'Ethereum',
   currency: 'ETH',
   explorerUrl: 'https://etherscan.io',
-  rpcUrl: 'https://eth.llamarpc.com	',
+  rpcUrl: 'https://eth.llamarpc.com',
 };
 
 type ChainConfig = {
@@ -78,8 +78,8 @@ const ethersConfig = defaultConfig({
   enableEIP6963: true, // true by default
   enableInjected: true, // true by default
   enableCoinbase: true, // true by default
-  rpcUrl: '...', // used for the Coinbase SDK
-  defaultChainId: 1, // used for the Coinbase SDK
+  rpcUrl: 'http://127.0.0.1:8545',
+  defaultChainId: 31337,
 });
 
 // 5. Create a Web3Modal instance

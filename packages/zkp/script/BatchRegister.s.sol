@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Script, console} from "forge-std/Script.sol";
+import {console} from "forge-std/Script.sol";
 import {ZK_KYC} from "../src/ZK_KYC.sol";
+import {ScriptConfig} from "./ScriptConfig.s.sol";
 
-contract ZK_KYC_DEPLOY is Script {
+contract ZK_KYC_DEPLOY is ScriptConfig {
     function setUp() public {}
 
     function run() public {
         vm.broadcast();
         // link deployed address
-        ZK_KYC zkKYC = ZK_KYC(0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512);
+        ZK_KYC zkKYC = ZK_KYC(getZkKycAddress());
 
         address[] memory users = new address[](3);
         users[0] = address(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);

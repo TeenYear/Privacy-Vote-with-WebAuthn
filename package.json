@@ -1,18 +1,19 @@
 {
-  "name": "client",
+  "name": "privacy-vote",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start:zkp": "anvil -a 20",
-    "deploy:contracts": "cd packages/zkp && forge script script/Deploy.s.sol --fork-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast && forge script script/BatchRegister.s.sol --fork-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast && forge script script/SubmitProposal.s.sol --fork-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast",
-    "build:client": "pnpm --filter client build",
-    "build:server": "pnpm --filter server build",
-    "start:client": "pnpm --filter client start",
-    "start:server": "pnpm --filter server start",
+    "start:zkp": "anvil -a 20 --code-size-limit 65536",
+    "prepare:dev-start": "node scripts/prepare-dev-start.cjs",
+    "deploy:contracts": "cd packages/zkp && forge script script/Deploy.s.sol --fork-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast && forge script script/BatchRegister.s.sol --fork-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast && forge script script/SubmitProposal.s.sol --fork-url http://127.0.0.1:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast && cd ../.. && node scripts/sync-contract-address.cjs",
+    "build:client": "pnpm --filter ./packages/client build",
+    "build:server": "pnpm --filter ./packages/server build",
+    "start:client": "pnpm --filter ./packages/client start",
+    "start:server": "pnpm --filter ./packages/server dev",
     "deploy": "pnpm run build && pnpm run start",
     "build": "pnpm run build:server && pnpm run build:client",
-    "start": "concurrently \"pnpm:start:server\" \"pnpm:start:client\""
+    "start": "pnpm run prepare:dev-start && concurrently --kill-others-on-fail --names server,client \"pnpm run start:server\" \"pnpm run start:client\""
   },
   "keywords": [],
   "author": "",
