@@ -24,7 +24,7 @@ const MAX_SELECTIONS = 1;
 interface Candidate {
   id: number;
   name: string;
-  votesFor: number;
+  voteCount: number;
 }
 
 interface VoteFormProps {
