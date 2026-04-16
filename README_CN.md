@@ -1,6 +1,6 @@
 # Privacy Vote — 基于零知识证明的匿名投票系统
 
-> [English version](./README_EN.md)
+> [English version](./README.md)
 
 Privacy Vote 将 **WebAuthn 无密码认证**、**Noir 零知识电路** 和 **Solidity 智能合约** 三者结合，实现了一套"已认证但匿名"的投票流程：
 投票方可证明自己是经过 KYC 审核的合法用户，却不会向任何人泄露"是谁投了哪一票"。
