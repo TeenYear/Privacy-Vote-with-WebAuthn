@@ -1,6 +1,6 @@
 # Privacy Vote — Anonymous Voting with Zero-Knowledge Proofs
 
-> [中文版](./README.md)
+> [中文版](./README_CN.md)
 
 Privacy Vote combines **WebAuthn passwordless authentication**, **Noir zero-knowledge circuits**, and **Solidity smart contracts** to build a "verified yet anonymous" voting pipeline:
 voters can prove they are legitimate KYC-approved users without revealing *who* cast *which* vote.
