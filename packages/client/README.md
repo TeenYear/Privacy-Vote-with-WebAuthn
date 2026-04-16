@@ -502,7 +502,8 @@ console.log('Wallet provider:', walletProvider);
 pnpm deploy:contracts
 ```
 2. Copy the contract address from the output.
-3. Update `WebAuthnAddress` in `connectButton.tsx`.
+3. Update `REACT_APP_ZK_KYC_ADDRESS` in `packages/client/.env.local` to match the deployed address.
+4. Restart the client dev server so the updated env value is loaded.
 
 ### Q: Vote fails with "User not found"
 
